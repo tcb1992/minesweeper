@@ -1,5 +1,6 @@
 import enum
 import random
+from functools import reduce
 
 class MinesweeperGame:
 	"""Stores game state for current game of Minesweeper - seperate state from presentation code"""
@@ -9,25 +10,111 @@ class MinesweeperGame:
 		if mines >= (x * y):
 			raise ValueError("There must be more grid squares than mines")
 
+		if (x < 8):
+			raise ValueError("Minimum width is 8 squares")
+
 		self.width = x
 		self.height = y
 		self.mineCount = mines
-		self.started = False
+		self.running = False
+		self.over = False
+		self.won = False
+		self.time = 0
 
-		self.grid = [[MinesweeperGridState.COVERED_BLANK for x in range(self.width)] for y in range(self.height)]
+		self.grid = [[MinesweeperGridState.COVERED for x in range(self.width)] for y in range(self.height)]
 
 		"""distribute mines"""
 		distributedMines = 0
 		while distributedMines < self.mineCount:
-			loc_x = random.randint(0, self.width - 1)
-			loc_y = random.randint(0, self.height - 1)
-			if self.grid[loc_y][loc_x] == MinesweeperGridState.COVERED_BLANK:
-				self.grid[loc_y][loc_x] = MinesweeperGridState.COVERED_MINE;
+			loc = (random.randint(0, self.width - 1), random.randint(0, self.height - 1))
+			if self.state(loc) == MinesweeperGridState.COVERED:
+				self.setState(loc, MinesweeperGridState.COVERED | MinesweeperGridState.MINE);
 				distributedMines += 1
 
+	def flag(self, loc):
+		if not self.running:
+			self.running = True
+		if self.state(loc) & MinesweeperGridState.COVERED:
+			if self.state(loc) & MinesweeperGridState.FLAGGED:
+				self.setState(loc, self.state(loc) & ~MinesweeperGridState.FLAGGED)
+			else:
+				self.setState(loc, self.state(loc) | MinesweeperGridState.FLAGGED)
 
-class MinesweeperGridState(enum.Enum):
-	COVERED_BLANK = enum.auto()
-	COVERED_MINE = enum.auto()
-	UNCOVERED_BLANK = enum.auto()
-	UNCOVERED_MINE = enum.auto()
+	def uncover(self, loc):
+		if not self.running:
+			self.running = True
+		if (self.state(loc) & MinesweeperGridState.COVERED) and not (self.state(loc) & MinesweeperGridState.FLAGGED):
+			self.setState(loc, self.state(loc) & ~MinesweeperGridState.COVERED)
+			if self.state(loc) & MinesweeperGridState.MINE:
+				#game over
+				self.lose()
+			elif self.gridNumber(loc) == 0:
+				for loc in self.neighbours(loc):
+					if (self.state(loc) & MinesweeperGridState.COVERED) and not (self.state(loc) & MinesweeperGridState.FLAGGED):
+						self.uncover(loc)
+
+	def gridNumber(self, loc):
+		if self.state(loc) & MinesweeperGridState.MINE:
+			return 0
+		else:
+			return sum(map(lambda loc: bool(self.state(loc) & MinesweeperGridState.MINE), self.neighbours(loc)))
+
+	def state(self, loc):
+		return self.grid[loc[1]][loc[0]]
+
+	def setState(self, loc, val):
+		self.grid[loc[1]][loc[0]] = val
+
+	def neighbours(self, loc):
+		returnVal = []
+		if loc[0] > 0:
+			returnVal.append((loc[0] - 1, loc[1]))
+			if loc[1] > 0:
+				returnVal.append((loc[0] - 1, loc[1] - 1))
+			if loc[1] < self.height - 1:
+				returnVal.append((loc[0] - 1, loc[1] + 1))
+		if loc[1] > 0:
+			returnVal.append((loc[0], loc[1] - 1))
+		if loc[1] < self.height - 1:
+			returnVal.append((loc[0], loc[1] + 1))
+		if loc[0] < self.width - 1:
+			returnVal.append((loc[0] + 1, loc[1]))
+			if loc[1] > 0:
+				returnVal.append((loc[0] + 1, loc[1] - 1))
+			if loc[1] < self.height - 1:
+				returnVal.append((loc[0] + 1, loc[1] + 1))
+		return returnVal
+
+	def updateClock(self, milliseconds):
+		if self.running:
+			self.time += milliseconds
+
+	def lose(self):
+		self.running = False
+		self.over = True
+
+	def win(self):
+		self.running = False
+		self.over = True
+		self.won = True
+
+		for x in range(self.width):
+			for y in range(self.height):
+				if (self.state((x, y)) & MinesweeperGridState.MINE) and (self.state((x, y)) & MinesweeperGridState.COVERED):
+					self.setState((x, y), self.state((x, y)) | MinesweeperGridState.FLAGGED)
+
+	def hasWon(self):
+		for x in range(self.width):
+			for y in range(self.height):
+				if not (self.state((x, y)) & MinesweeperGridState.MINE) and (self.state((x, y)) & MinesweeperGridState.COVERED):
+					return False;
+		return True;
+
+
+
+
+class MinesweeperGridState(enum.Flag):
+	MINE = enum.auto()
+	COVERED = enum.auto()
+	FLAGGED = enum.auto()
+	Q_MARK = enum.auto()

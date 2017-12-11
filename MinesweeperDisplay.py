@@ -10,8 +10,9 @@ class MinesweeperDisplay:
 		self.screen = pygame.display.set_mode(self.pixelSize())
 		pygame.display.set_caption("Minesweeper")
 
-		self.GREY = (0xC0, 0xC0, 0xC0)	
+		self.GREY = (0xC0, 0xC0, 0xC0)
 		self.mouseDownLoc = (-1, -1)
+		self.smileClicked = False
 
 		spriteImage = pygame.image.load("sprites.gif").convert()
 
@@ -75,6 +76,9 @@ class MinesweeperDisplay:
 	def gridRect(self):
 		return pygame.Rect(self.gridLoc(), self.gridSize())
 
+	def smileyFaceRect(self):
+		return pygame.Rect((self.pixelSize()[0]/2 - 13, 13), (26, 26))
+
 	def gridLocOfPos(self, pos):
 		#floor division: //
 		return ((pos[0] - 10)//16, (pos[1] - 52)//16)
@@ -84,10 +88,15 @@ class MinesweeperDisplay:
 		if self.game.over and not self.game.won:
 			if not (state & MinesweeperGridState.COVERED) and (state & MinesweeperGridState.MINE):
 				return "UNCOVERED_RED_MINE"
-			elif (state & MinesweeperGridState.COVERED) and (state & MinesweeperGridState.MINE):
-				return "UNCOVERED_MINE"
-			elif (state & MinesweeperGridState.FLAGGED) and (state & MinesweeperGridState.MINE):
-				return "UNCOVERED_WRONG_MINE"
+			elif state & MinesweeperGridState.COVERED:
+				if state & MinesweeperGridState.FLAGGED:
+					if state & MinesweeperGridState.MINE:
+						return "COVERED_FLAG"
+					else:
+						return "UNCOVERED_WRONG_MINE"
+				elif state & MinesweeperGridState.MINE:
+					return "UNCOVERED_MINE"
+
 
 		if state & MinesweeperGridState.COVERED:
 			if state & MinesweeperGridState.FLAGGED:
@@ -112,6 +121,24 @@ class MinesweeperDisplay:
 		digits = (math.floor(num/100) % 10, math.floor(num/10) % 10, math.floor(num) % 10)
 		return list(map(lambda x: self.sprites["NUMBER_" + str(x)], digits))
 
+	def smileState(self):
+		if self.smileClicked:
+			return "CLICKED_SMILE_FACE"
+		elif self.game.running and not self.mouseDownLoc == (-1, -1):
+			return "O_FACE"
+		elif not self.game.running and self.game.over and self.game.won:
+			return "SUNGLASSES_FACE"
+		elif not self.game.running and self.game.over and not self.game.won:
+			return "DEAD_FACE"
+		else:
+			return "SMILE_FACE"
+
+	def reset(self, game):
+		self.game = game
+		self.screen = pygame.display.set_mode(self.pixelSize())
+		pygame.display.set_caption("Minesweeper")
+		self.mouseDownLoc = (-1, -1)
+		self.smileClicked = False		
 
 	def draw(self):
 		self.screen.fill(self.GREY)
@@ -156,5 +183,17 @@ class MinesweeperDisplay:
 		self.screen.blit(timerSprites[0], ((20+16*self.game.width) - 55, 14))
 		self.screen.blit(timerSprites[1], ((20+16*self.game.width) - 42, 14))
 		self.screen.blit(timerSprites[2], ((20+16*self.game.width) - 29, 14))
+
+		#smiley face
+		self.screen.blit(self.sprites[self.smileState()], self.smileyFaceRect())
+
+		#flag count
+		flagCount = self.game.mineCount - self.game.numFlags()
+		if flagCount < 0:
+			flagCount = 0
+		flagCountSprites = self.numberSprites(flagCount)
+		self.screen.blit(flagCountSprites[0], (16, 14))
+		self.screen.blit(flagCountSprites[1], (29, 14))
+		self.screen.blit(flagCountSprites[2], (42, 14))
 
 		pygame.display.flip()

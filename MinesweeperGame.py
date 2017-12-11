@@ -41,17 +41,18 @@ class MinesweeperGame:
 				self.setState(loc, self.state(loc) | MinesweeperGridState.FLAGGED)
 
 	def uncover(self, loc):
-		if not self.running:
-			self.running = True
-		if (self.state(loc) & MinesweeperGridState.COVERED) and not (self.state(loc) & MinesweeperGridState.FLAGGED):
-			self.setState(loc, self.state(loc) & ~MinesweeperGridState.COVERED)
-			if self.state(loc) & MinesweeperGridState.MINE:
-				#game over
-				self.lose()
-			elif self.gridNumber(loc) == 0:
-				for loc in self.neighbours(loc):
-					if (self.state(loc) & MinesweeperGridState.COVERED) and not (self.state(loc) & MinesweeperGridState.FLAGGED):
-						self.uncover(loc)
+		if not self.over:
+			if not self.running:
+				self.running = True
+			if (self.state(loc) & MinesweeperGridState.COVERED) and not (self.state(loc) & MinesweeperGridState.FLAGGED):
+				self.setState(loc, self.state(loc) & ~MinesweeperGridState.COVERED)
+				if self.state(loc) & MinesweeperGridState.MINE:
+					#game over
+					self.lose()
+				elif self.gridNumber(loc) == 0:
+					for loc in self.neighbours(loc):
+						if (self.state(loc) & MinesweeperGridState.COVERED) and not (self.state(loc) & MinesweeperGridState.FLAGGED):
+							self.uncover(loc)
 
 	def gridNumber(self, loc):
 		if self.state(loc) & MinesweeperGridState.MINE:
@@ -110,6 +111,13 @@ class MinesweeperGame:
 					return False;
 		return True;
 
+	def numFlags(self):
+		flagCount = 0
+		for x in range(self.width):
+			for y in range(self.height):
+				if self.state((x, y)) & MinesweeperGridState.FLAGGED:
+					flagCount += 1
+		return flagCount
 
 
 
